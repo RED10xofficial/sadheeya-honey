@@ -23,7 +23,7 @@ function GSAPBridge() {
 
     // GSAP drives Lenis — no double RAF, no drift
     function onTick(time: number) {
-      lenis.raf(time * 1000);
+      lenis?.raf(time * 1000);
     }
     gsap.ticker.add(onTick);
     // Disable lag smoothing so ScrollTrigger reacts to every Lenis frame
@@ -50,7 +50,6 @@ export default function LenisProvider({ children }: { children: React.ReactNode 
         touchMultiplier: 1.2,
         orientation: 'vertical',
         gestureOrientation: 'vertical',
-        normalizeWheel: true, // consistent speed across all wheels/trackpads
       }}
     >
       <GSAPBridge />
