@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
@@ -10,8 +10,8 @@ const FRAME_COUNT = 240;
 
 // ── Timeline constants ────────────────────────────────────────────────────────
 const TITLE_EXIT_END = 0.45;
-const CHAPTER_START = 0.55;  // first chapter enters right after title leaves
-const CHAPTER_STAGGER = 0.5;  // tight stagger — all 4 done by ~2.6 units
+const CHAPTER_START = 0.55;
+const CHAPTER_STAGGER = 0.5;
 const ENTER_DUR = 0.38;
 
 const chapters = [
@@ -37,7 +37,7 @@ const chapters = [
     number: '04',
     tag: 'The Commitment',
     title: 'Sustainably Crafted',
-    text: 'We are committed to sustainable beekeeping practices that prioritize the well-being of our pollinators and the ecosystems they inhabit. By choosing our Wildflower Honey, you are not only enjoying a premium product but also supporting responsible stewardship of nature\'s resources.',
+    text: "We are committed to sustainable beekeeping practices that prioritize the well-being of our pollinators and the ecosystems they inhabit. By choosing our Wildflower Honey, you are not only enjoying a premium product but also supporting responsible stewardship of nature's resources.",
   },
 ];
 
@@ -45,7 +45,6 @@ function getFramePath(index: number): string {
   return `/images/process-sequence/ezgif-frame-${String(index).padStart(3, '0')}.webp`;
 }
 
-/** Animate a chapter card in and leave it there. */
 function animateChapterIn(
   tl: gsap.core.Timeline,
   el: HTMLDivElement,
@@ -73,18 +72,27 @@ function animateChapterIn(
 }
 
 export default function ProcessSequence() {
+  const [isMobile, setIsMobile] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const titleRef = useRef<HTMLDivElement>(null);
   const scrollHintRef = useRef<HTMLDivElement>(null);
   const chapterRefs = useRef<(HTMLDivElement | null)[]>([]);
 
+  // Detect mobile once on mount
   useEffect(() => {
-    // ── Prevent broken state after refresh at scrolled position ──────────────
-    if (typeof window !== 'undefined') {
-      window.history.scrollRestoration = 'manual';
-      window.scrollTo({ top: 0, behavior: 'instant' });
-    }
+    setIsMobile(window.innerWidth < 768);
+    setMounted(true);
+  }, []);
+
+  // Desktop-only GSAP animation setup
+  useEffect(() => {
+    if (!mounted || isMobile) return;
+
+    window.history.scrollRestoration = 'manual';
+    window.scrollTo({ top: 0, behavior: 'instant' });
 
     const canvas = canvasRef.current;
     const container = containerRef.current;
@@ -95,7 +103,6 @@ export default function ProcessSequence() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Preload frames
     const frames: HTMLImageElement[] = Array.from({ length: FRAME_COUNT }, (_, i) => {
       const img = new Image();
       img.src = getFramePath(i + 1);
@@ -133,7 +140,6 @@ export default function ProcessSequence() {
     frames[0].onload = () => renderFrame(0);
     if (frames[0].complete) renderFrame(0);
 
-    // ── Frame scroll animation ────────────────────────────────────────────────
     const frameTrigger = ScrollTrigger.create({
       trigger: container,
       start: 'top top',
@@ -145,7 +151,6 @@ export default function ProcessSequence() {
       },
     });
 
-    // ── Title: blur-in on mount ───────────────────────────────────────────────
     gsap.fromTo(
       title,
       { filter: 'blur(28px)', opacity: 0, y: 40 },
@@ -159,7 +164,6 @@ export default function ProcessSequence() {
       );
     }
 
-    // ── Scroll-driven timeline ────────────────────────────────────────────────
     const tl = gsap.timeline({
       scrollTrigger: {
         trigger: container,
@@ -169,18 +173,15 @@ export default function ProcessSequence() {
       },
     });
 
-    // Title exits
     tl.to(title, { y: -220, opacity: 0, filter: 'blur(20px)', duration: TITLE_EXIT_END, ease: 'power2.inOut' }, 0);
     if (scrollHint) tl.to(scrollHint, { opacity: 0, duration: 0.25 }, 0);
 
-    // Chapters reveal: 01(top-left) → 02(top-right) → 03(bottom-left) → 04(bottom-right)
     const fromXMap = [-90, 90, -90, 90];
     chapterRefs.current.forEach((el, i) => {
       if (!el) return;
       animateChapterIn(tl, el, CHAPTER_START + i * CHAPTER_STAGGER, fromXMap[i]);
     });
 
-    // Breathing room at the end
     const totalDuration = CHAPTER_START + chapters.length * CHAPTER_STAGGER + 0.8;
     tl.to({}, {}, totalDuration);
 
@@ -194,28 +195,110 @@ export default function ProcessSequence() {
       ScrollTrigger.getAll().forEach((t) => t.kill());
       window.removeEventListener('resize', handleResize);
     };
-  }, []);
+  }, [mounted, isMobile]);
 
+  // Pre-hydration placeholder prevents layout shift
+  if (!mounted) {
+    return <div className="h-screen bg-black" />;
+  }
+
+  // ── Mobile: static last frame + all chapters visible ─────────────────────
+  if (isMobile) {
+    return (
+      <section>
+        {/* Full-screen hero with last frame */}
+        <div className="relative h-screen bg-black overflow-hidden">
+          <img
+            src={getFramePath(FRAME_COUNT)}
+            alt="Wild honey story"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-black/45 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-black/40 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/25 pointer-events-none" />
+
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-white text-center px-6">
+            <h2
+              className="font-black tracking-tighter leading-[0.88] uppercase text-white"
+              style={{ fontSize: 'clamp(2.5rem,13vw,5rem)' }}
+            >
+              The Story of
+              <br />
+              <span className="text-primary-extra-light">Wild Honey</span>
+            </h2>
+            <p className="mt-5 text-white/40 text-xs tracking-[0.4em] uppercase font-light">
+              Nature · Purity · Craftsmanship
+            </p>
+          </div>
+        </div>
+
+        {/* All chapter cards — single column, full opacity */}
+        <div className="bg-black px-5 py-10">
+          <div className="flex flex-col gap-5 max-w-sm mx-auto">
+            {chapters.map((ch) => (
+              <div key={ch.number} className="relative rounded-2xl border border-white/8 bg-white/[0.2] backdrop-blur-sm px-6 py-5 overflow-hidden">
+                <span
+                  className="c-num absolute -top-3 -right-2 font-black leading-none select-none pointer-events-none"
+                  style={{ fontSize: '5rem', color: 'rgba(255,255,255,0.04)', lineHeight: 1 }}
+                >
+                  {ch.number}
+                </span>
+
+                <div className="c-tag flex items-center gap-3 mb-3">
+                  <span
+                    className="text-[10px] tracking-[0.5em] uppercase font-medium"
+                    style={{ color: 'var(--color-primary-extra-light, #e8c97a)' }}
+                  >
+                    {ch.tag}
+                  </span>
+                  <span className="text-white/20 text-[10px] font-light">— {ch.number}</span>
+                </div>
+
+                <h3 className="c-title font-bold text-white leading-tight mb-3 text-lg">
+                  {ch.title}
+                </h3>
+
+                <div
+                  className="c-line mb-4"
+                  style={{
+                    height: 1.5,
+                    width: 48,
+                    background: 'linear-gradient(to right, var(--color-primary-extra-light, #e8c97a), transparent)',
+                  }}
+                />
+
+                <p className="c-text text-white/90 text-sm leading-relaxed font-light">
+                  {ch.text}
+                </p>
+
+                <div
+                  className="absolute bottom-0 right-0 w-16 h-16 pointer-events-none"
+                  style={{ background: 'radial-gradient(circle at bottom right, rgba(232,201,122,0.07), transparent 70%)' }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // ── Desktop: full scroll-driven animation ─────────────────────────────────
   return (
-    <section ref={containerRef} className="relative h-[600vh]">
+    <section ref={containerRef} className="relative h-[500vh]">
       <div className="sticky top-0 h-screen w-full overflow-hidden bg-black">
 
-        {/* Canvas */}
         <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
 
-        {/* Overlays */}
         <div className="absolute inset-0 bg-black/45 pointer-events-none" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-black/40 pointer-events-none" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/25 pointer-events-none" />
 
-        {/* ── Section title ─────────────────────────────────────────────────── */}
         <div
           ref={titleRef}
           className="absolute inset-0 flex flex-col items-center justify-center text-white text-center px-6"
           style={{ opacity: 0 }}
         >
-
-
           <h2
             className="font-black tracking-tighter leading-[0.88] uppercase text-white"
             style={{ fontSize: 'clamp(3rem,8vw,6.5rem)' }}
@@ -224,11 +307,9 @@ export default function ProcessSequence() {
             <br />
             <span className="text-primary-extra-light">Wild Honey</span>
           </h2>
-
           <p className="mt-5 text-white/40 text-xs md:text-sm tracking-[0.4em] uppercase font-light max-w-xs">
             Nature · Purity · Craftsmanship
           </p>
-
           <div
             ref={scrollHintRef}
             className="absolute bottom-10 flex flex-col items-center gap-2"
@@ -239,10 +320,8 @@ export default function ProcessSequence() {
           </div>
         </div>
 
-        {/* ── Story chapters — 2 × 2 editorial grid ─────────────────────────── */}
         <div className="absolute inset-0 flex items-center justify-center px-8 md:px-12 lg:px-16">
           <div className="w-full max-w-6xl grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-
             {chapters.map((ch, i) => (
               <div
                 key={ch.number}
@@ -250,22 +329,13 @@ export default function ProcessSequence() {
                 style={{ opacity: 0 }}
                 className="group relative h-full"
               >
-                {/* Glass card */}
                 <div className="relative h-full rounded-2xl border border-white/8 bg-white/[0.2] backdrop-blur-sm px-7 py-6 overflow-hidden">
-
-                  {/* Faint watermark number */}
                   <span
                     className="c-num absolute -top-3 -right-2 font-black leading-none select-none pointer-events-none"
-                    style={{
-                      fontSize: 'clamp(6rem,10vw,9rem)',
-                      color: 'rgba(255,255,255,0.04)',
-                      lineHeight: 1,
-                    }}
+                    style={{ fontSize: 'clamp(6rem,10vw,9rem)', color: 'rgba(255,255,255,0.04)', lineHeight: 1 }}
                   >
                     {ch.number}
                   </span>
-
-                  {/* Chapter tag */}
                   <div className="c-tag flex items-center gap-3 mb-3">
                     <span
                       className="text-[10px] tracking-[0.5em] uppercase font-medium"
@@ -275,16 +345,12 @@ export default function ProcessSequence() {
                     </span>
                     <span className="text-white/20 text-[10px] font-light">— {ch.number}</span>
                   </div>
-
-                  {/* Title */}
                   <h3
                     className="c-title font-bold text-white leading-tight mb-3"
                     style={{ fontSize: 'clamp(1.1rem,2vw,1.45rem)' }}
                   >
                     {ch.title}
                   </h3>
-
-                  {/* Decorative line */}
                   <div
                     className="c-line mb-4 origin-left"
                     style={{
@@ -293,23 +359,16 @@ export default function ProcessSequence() {
                       background: 'linear-gradient(to right, var(--color-primary-extra-light, #e8c97a), transparent)',
                     }}
                   />
-
-                  {/* Paragraph */}
                   <p className="c-text text-white/90 text-sm leading-relaxed font-light">
                     {ch.text}
                   </p>
-
-                  {/* Subtle corner accent */}
                   <div
                     className="absolute bottom-0 right-0 w-16 h-16 pointer-events-none"
-                    style={{
-                      background: 'radial-gradient(circle at bottom right, rgba(232,201,122,0.07), transparent 70%)',
-                    }}
+                    style={{ background: 'radial-gradient(circle at bottom right, rgba(232,201,122,0.07), transparent 70%)' }}
                   />
                 </div>
               </div>
             ))}
-
           </div>
         </div>
 

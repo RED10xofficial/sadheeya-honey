@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
@@ -9,50 +9,20 @@ gsap.registerPlugin(ScrollTrigger);
 const FRAME_COUNT = 240;
 
 // ── Timeline constants ────────────────────────────────────────────────────────
-// Each "unit" of scroll time is a fraction of the total scroll distance.
-// Frame sequence covers the first ~4/5 of the scroll (frameTrigger ends at
-// containerTop + 4×100vh; total scroll ≈ 500vh with a 600vh section).
-// All 6 cards must appear before ~80% of scroll, so we keep total ≤ 4.0 units.
-const TITLE_EXIT_END = 0.45;  // title exits fast
-const CARD_START = 0.55;  // benefits begin right after title leaves
-const CARD_STAGGER = 0.42;  // tight — 6 cards done by ~3.1 units (77% of 4.0)
-const ENTER_DUR = 0.32;  // snappy entrance
-const DIVIDER_AT = CARD_START - 0.08;
+const TITLE_EXIT_END = 0.45;
+const CARD_START = 0.55;
+const CARD_STAGGER = 0.42;
+const ENTER_DUR = 0.32;
 
 const benefits = [
-  {
-    number: '01',
-    title: 'Rich in Antioxidants',
-    description: 'Packed with natural antioxidants that support overall health and well-being.',
-  },
-  {
-    number: '02',
-    title: 'Natural Energy Booster',
-    description: 'A great source of natural sugars for a quick and sustained energy boost.',
-  },
-  {
-    number: '03',
-    title: 'Soothes Throat & Cough',
-    description: 'A natural remedy for throat irritation and coughs, known for its soothing properties.',
-  },
-  {
-    number: '04',
-    title: 'Supports Digestive Health',
-    description: 'Contains enzymes that aid in digestion and promote a healthy gut.',
-  },
-  {
-    number: '05',
-    title: 'Skin Nourishment',
-    description: 'Used in skincare routines for its moisturizing and healing properties.',
-  },
-  {
-    number: '06',
-    title: 'Sustainable Choice',
-    description: 'Supports eco-friendly beekeeping practices and the preservation of pollinators.',
-  },
+  { number: '01', title: 'Rich in Antioxidants', description: 'Packed with natural antioxidants that support overall health and well-being.' },
+  { number: '02', title: 'Natural Energy Booster', description: 'A great source of natural sugars for a quick and sustained energy boost.' },
+  { number: '03', title: 'Soothes Throat & Cough', description: 'A natural remedy for throat irritation and coughs, known for its soothing properties.' },
+  { number: '04', title: 'Supports Digestive Health', description: 'Contains enzymes that aid in digestion and promote a healthy gut.' },
+  { number: '05', title: 'Skin Nourishment', description: 'Used in skincare routines for its moisturizing and healing properties.' },
+  { number: '06', title: 'Sustainable Choice', description: 'Supports eco-friendly beekeeping practices and the preservation of pollinators.' },
 ];
 
-// Left column: 01, 03, 05  |  Right column: 02, 04, 06
 const leftBenefits = [benefits[0], benefits[2], benefits[4]];
 const rightBenefits = [benefits[1], benefits[3], benefits[5]];
 
@@ -60,14 +30,12 @@ function getFramePath(index: number): string {
   return `/images/banner-sequence/ezgif-frame-${String(index).padStart(3, '0')}.webp`;
 }
 
-/** Animate a single benefit card into view and leave it there. */
 function animateCardIn(
   tl: gsap.core.Timeline,
   el: HTMLDivElement,
   enterAt: number,
   fromX: number,
 ) {
-  // Card container slides + blurs in
   tl.fromTo(
     el,
     { x: fromX, y: 30, opacity: 0, filter: 'blur(10px)' },
@@ -75,7 +43,6 @@ function animateCardIn(
     enterAt,
   );
 
-  // Internal elements stagger
   const line = el.querySelector<HTMLElement>('.b-line');
   const num = el.querySelector<HTMLElement>('.b-num');
   const title = el.querySelector<HTMLElement>('.b-title');
@@ -88,26 +55,29 @@ function animateCardIn(
 }
 
 export default function BannerSequence() {
+  const [isMobile, setIsMobile] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const titleRef = useRef<HTMLDivElement>(null);
   const scrollHintRef = useRef<HTMLDivElement>(null);
   const dividerRef = useRef<HTMLDivElement>(null);
-
-  // leftRefs[0]=top-left (01), [1]=mid-left (03), [2]=bottom-left (05)
   const leftRefs = useRef<(HTMLDivElement | null)[]>([]);
-  // rightRefs[0]=top-right (02), [1]=mid-right (04), [2]=bottom-right (06)
   const rightRefs = useRef<(HTMLDivElement | null)[]>([]);
 
+  // Detect mobile once on mount
   useEffect(() => {
-    // ── Prevent broken state after refresh at scrolled position ─────────────
-    // Browser scroll-restoration puts us mid-page before GSAP initialises,
-    // causing fromTo scrub animations to get stuck in their "from" state.
-    // Disabling it and jumping to top guarantees a clean starting point.
-    if (typeof window !== 'undefined') {
-      window.history.scrollRestoration = 'manual';
-      window.scrollTo({ top: 0, behavior: 'instant' });
-    }
+    setIsMobile(window.innerWidth < 768);
+    setMounted(true);
+  }, []);
+
+  // Desktop-only GSAP animation setup
+  useEffect(() => {
+    if (!mounted || isMobile) return;
+
+    window.history.scrollRestoration = 'manual';
+    window.scrollTo({ top: 0, behavior: 'instant' });
 
     const canvas = canvasRef.current;
     const container = containerRef.current;
@@ -118,7 +88,6 @@ export default function BannerSequence() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Preload all frames
     const frames: HTMLImageElement[] = Array.from({ length: FRAME_COUNT }, (_, i) => {
       const img = new Image();
       img.src = getFramePath(i + 1);
@@ -156,7 +125,6 @@ export default function BannerSequence() {
     frames[0].onload = () => renderFrame(0);
     if (frames[0].complete) renderFrame(0);
 
-    // ── Frame scroll animation ────────────────────────────────────────────────
     const frameTrigger = ScrollTrigger.create({
       trigger: container,
       start: 'top top',
@@ -168,7 +136,6 @@ export default function BannerSequence() {
       },
     });
 
-    // ── Title blur-in on mount ────────────────────────────────────────────────
     gsap.fromTo(
       title,
       { filter: 'blur(28px)', opacity: 0, y: 40 },
@@ -182,7 +149,6 @@ export default function BannerSequence() {
       );
     }
 
-    // ── Scroll-driven timeline ────────────────────────────────────────────────
     const tl = gsap.timeline({
       scrollTrigger: {
         trigger: container,
@@ -192,30 +158,16 @@ export default function BannerSequence() {
       },
     });
 
-    // Title + scroll hint exit
     tl.to(title, { y: -220, opacity: 0, filter: 'blur(20px)', duration: TITLE_EXIT_END, ease: 'power2.inOut' }, 0);
     if (scrollHint) tl.to(scrollHint, { opacity: 0, duration: 0.25 }, 0);
 
-    // Divider fades in just before cards start
-    // const divider = dividerRef.current;
-    // if (divider) {
-    //   tl.fromTo(
-    //     divider,
-    //     { opacity: 0, scaleY: 0 },
-    //     { opacity: 1, scaleY: 1, duration: 0.4, ease: 'power2.out' },
-    //     DIVIDER_AT,
-    //   );
-    // }
-
-    // ── Benefits reveal order ────────────────────────────────────────────────
-    // Row by row: 01 → 02 → 03 → 04 → 05 → 06
     const revealOrder: { ref: HTMLDivElement | null; fromX: number }[] = [
-      { ref: leftRefs.current[0], fromX: -90 }, // 01 top-left
-      { ref: rightRefs.current[0], fromX: 90 }, // 02 top-right
-      { ref: leftRefs.current[1], fromX: -90 }, // 03 mid-left
-      { ref: rightRefs.current[1], fromX: 90 }, // 04 mid-right
-      { ref: leftRefs.current[2], fromX: -90 }, // 05 bottom-left
-      { ref: rightRefs.current[2], fromX: 90 }, // 06 bottom-right
+      { ref: leftRefs.current[0], fromX: -90 },
+      { ref: rightRefs.current[0], fromX: 90 },
+      { ref: leftRefs.current[1], fromX: -90 },
+      { ref: rightRefs.current[1], fromX: 90 },
+      { ref: leftRefs.current[2], fromX: -90 },
+      { ref: rightRefs.current[2], fromX: 90 },
     ];
 
     revealOrder.forEach(({ ref, fromX }, i) => {
@@ -223,15 +175,10 @@ export default function BannerSequence() {
       animateCardIn(tl, ref, CARD_START + i * CARD_STAGGER, fromX);
     });
 
-    // Pad so the final state breathes before section ends
-    // Keep total ≤ 4.2 so all cards appear well before the frame sequence ends
     const totalDuration = CARD_START + revealOrder.length * CARD_STAGGER + 0.8;
     tl.to({}, {}, totalDuration);
 
-    // After forced scroll-to-top, let the browser settle then recalculate
-    // all ScrollTrigger boundaries so scrub progress starts correctly.
     const rafId = requestAnimationFrame(() => ScrollTrigger.refresh());
-
     const handleResize = () => renderFrame(state.frame);
     window.addEventListener('resize', handleResize);
 
@@ -241,40 +188,99 @@ export default function BannerSequence() {
       ScrollTrigger.getAll().forEach((t) => t.kill());
       window.removeEventListener('resize', handleResize);
     };
-  }, []);
+  }, [mounted, isMobile]);
 
+  // Pre-hydration placeholder prevents layout shift
+  if (!mounted) {
+    return <div className="h-screen bg-black" />;
+  }
+
+  // ── Mobile: static last frame + all cards visible ─────────────────────────
+  if (isMobile) {
+    return (
+      <section>
+        {/* Full-screen hero with last frame */}
+        <div className="relative h-screen bg-black overflow-hidden">
+          <img
+            src={getFramePath(FRAME_COUNT)}
+            alt="Wildflower honey"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-black/38 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/35 via-transparent to-black/35 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/20 pointer-events-none" />
+
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-white text-center px-6">
+            <span className="text-[10px] tracking-[0.55em] uppercase text-primary-extra-light mb-6 font-light">
+              Sadheeya
+            </span>
+            <h1
+              className="font-black tracking-tighter leading-[0.88] uppercase"
+              style={{ fontSize: 'clamp(3rem,15vw,5.5rem)' }}
+            >
+              Wild Flower
+              <br />
+              <span className="text-primary-extra-light">Honey</span>
+            </h1>
+            <p className="mt-4 text-white/40 text-xs tracking-[0.4em] uppercase font-light">
+              100% Raw · Unfiltered · Pure
+            </p>
+          </div>
+        </div>
+
+        {/* All benefit cards — single column, full opacity */}
+        <div className="bg-black px-6 py-12">
+          <div className="flex flex-col gap-10 max-w-sm mx-auto">
+            {benefits.map((b) => (
+              <div key={b.number}>
+                <div className="h-px bg-primary-extra-light mb-4" style={{ width: 56 }} />
+                <p
+                  className="font-black leading-none mb-2 select-none"
+                  style={{ fontSize: '3rem', color: 'rgba(255,255,255,0.3)' }}
+                >
+                  {b.number}
+                </p>
+                <h2 className="font-bold text-white leading-tight mb-2 text-lg">
+                  {b.title}
+                </h2>
+                <p className="text-white/55 text-sm leading-relaxed font-light">
+                  {b.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // ── Desktop: full scroll-driven animation ─────────────────────────────────
   return (
     <section ref={containerRef} className="relative h-[550vh]">
       <div className="sticky top-0 h-screen w-full overflow-hidden bg-black">
 
-        {/* Canvas */}
         <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
 
-        {/* Overlays */}
         <div className="absolute inset-0 bg-black/38 pointer-events-none" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/35 via-transparent to-black/35 pointer-events-none" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/20 pointer-events-none" />
 
-        {/* ── Hero title ───────────────────────────────────────────────────── */}
         <div
           ref={titleRef}
           className="absolute inset-0 flex flex-col items-center justify-center text-white text-center px-6"
           style={{ opacity: 0 }}
         >
           <span className="text-[10px] md:text-xs tracking-[0.55em] uppercase text-primary-extra-light mb-6 font-light">
-            By Sadheeya
+            Sadheeya
           </span>
-
           <h1 className="font-black tracking-tighter leading-[0.88] uppercase" style={{ fontSize: 'clamp(3.5rem,10vw,8rem)' }}>
             Wild Flower
             <br />
             <span className="text-primary-extra-light">Honey</span>
           </h1>
-
           <p className="mt-4 text-white/40 text-xs md:text-sm tracking-[0.4em] uppercase font-light">
             100% Raw &nbsp;·&nbsp; Unfiltered &nbsp;·&nbsp; Pure
           </p>
-
           <div
             ref={scrollHintRef}
             className="absolute bottom-10 flex flex-col items-center gap-2"
@@ -285,14 +291,9 @@ export default function BannerSequence() {
           </div>
         </div>
 
-        {/* ── Benefits grid ──────────────────────────────────────────────────
-             All 6 cards live here permanently; GSAP reveals them one by one.
-             Layout: 3 rows × 2 columns with a vertical centre divider.
-        ─────────────────────────────────────────────────────────────────── */}
         <div className="absolute inset-0 flex items-center justify-center px-8 md:px-14 lg:px-24">
           <div className="w-full max-w-5xl flex gap-0">
 
-            {/* ── Left column ── */}
             <div className="flex-1 flex flex-col gap-10 pr-8 md:pr-14 lg:pr-20">
               {leftBenefits.map((b, i) => (
                 <div
@@ -301,16 +302,10 @@ export default function BannerSequence() {
                   style={{ opacity: 0 }}
                 >
                   <div className="b-line h-px bg-primary-extra-light mb-4 origin-left" style={{ width: 56 }} />
-                  <p
-                    className="b-num font-black leading-none mb-1 select-none"
-                    style={{ fontSize: 'clamp(2.8rem,5vw,4.5rem)', color: 'rgba(255,255,255,0.3)' }}
-                  >
+                  <p className="b-num font-black leading-none mb-1 select-none" style={{ fontSize: 'clamp(2.8rem,5vw,4.5rem)', color: 'rgba(255,255,255,0.3)' }}>
                     {b.number}
                   </p>
-                  <h2
-                    className="b-title font-bold text-white leading-tight mb-2"
-                    style={{ fontSize: 'clamp(1.1rem,2vw,1.6rem)' }}
-                  >
+                  <h2 className="b-title font-bold text-white leading-tight mb-2" style={{ fontSize: 'clamp(1.1rem,2vw,1.6rem)' }}>
                     {b.title}
                   </h2>
                   <p className="b-desc text-white/55 text-sm md:text-[0.9rem] leading-relaxed font-light">
@@ -320,14 +315,12 @@ export default function BannerSequence() {
               ))}
             </div>
 
-            {/* ── Centre divider ── */}
             <div
               ref={dividerRef}
               className="hidden md:block w-px bg-white/15 flex-shrink-0 self-stretch origin-center"
               style={{ opacity: 0 }}
             />
 
-            {/* ── Right column ── */}
             <div className="flex-1 flex flex-col gap-10 pl-8 md:pl-14 lg:pl-20">
               {rightBenefits.map((b, i) => (
                 <div
@@ -336,16 +329,10 @@ export default function BannerSequence() {
                   style={{ opacity: 0 }}
                 >
                   <div className="b-line h-px bg-primary-extra-light mb-4 origin-left" style={{ width: 56 }} />
-                  <p
-                    className="b-num font-black leading-none mb-1 select-none"
-                    style={{ fontSize: 'clamp(2.8rem,5vw,4.5rem)', color: 'rgba(255,255,255,0.3)' }}
-                  >
+                  <p className="b-num font-black leading-none mb-1 select-none" style={{ fontSize: 'clamp(2.8rem,5vw,4.5rem)', color: 'rgba(255,255,255,0.3)' }}>
                     {b.number}
                   </p>
-                  <h2
-                    className="b-title font-bold text-white leading-tight mb-2"
-                    style={{ fontSize: 'clamp(1.1rem,2vw,1.6rem)' }}
-                  >
+                  <h2 className="b-title font-bold text-white leading-tight mb-2" style={{ fontSize: 'clamp(1.1rem,2vw,1.6rem)' }}>
                     {b.title}
                   </h2>
                   <p className="b-desc text-white/55 text-sm md:text-[0.9rem] leading-relaxed font-light">
