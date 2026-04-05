@@ -287,7 +287,7 @@ export default function BannerSequence() {
             <span className="text-primary-extra-light">Honey</span>
           </h1>
           <p className="mt-4 text-white/40 text-xs md:text-sm tracking-[0.4em] uppercase font-light">
-            100% Raw &nbsp;·&nbsp; Unfiltered &nbsp;·&nbsp; Pure
+            Raw &nbsp;·&nbsp; Unfiltered &nbsp;·&nbsp; Pure
           </p>
           <div
             ref={scrollHintRef}
