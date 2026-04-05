@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { useLenis } from 'lenis/react';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -57,6 +58,7 @@ function animateCardIn(
 export default function BannerSequence() {
   const [isMobile, setIsMobile] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const lenis = useLenis();
 
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -77,7 +79,12 @@ export default function BannerSequence() {
     if (!mounted || isMobile) return;
 
     window.history.scrollRestoration = 'manual';
-    window.scrollTo({ top: 0, behavior: 'instant' });
+    // Reset both native scroll and Lenis's internal target so scrub starts at 0
+    if (lenis) {
+      lenis.scrollTo(0, { immediate: true });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
 
     const canvas = canvasRef.current;
     const container = containerRef.current;
@@ -149,12 +156,13 @@ export default function BannerSequence() {
       );
     }
 
+    // scrub: 1 — Lenis already smooths input; heavy scrub on top feels sluggish
     const tl = gsap.timeline({
       scrollTrigger: {
         trigger: container,
         start: 'top top',
         end: 'bottom bottom',
-        scrub: 3,
+        scrub: 1,
       },
     });
 
@@ -188,7 +196,7 @@ export default function BannerSequence() {
       ScrollTrigger.getAll().forEach((t) => t.kill());
       window.removeEventListener('resize', handleResize);
     };
-  }, [mounted, isMobile]);
+  }, [mounted, isMobile, lenis]);
 
   // Pre-hydration placeholder prevents layout shift
   if (!mounted) {
