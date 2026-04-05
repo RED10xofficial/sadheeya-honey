@@ -42,7 +42,7 @@ const chapters = [
 ];
 
 function getFramePath(index: number): string {
-  return `/images/process-sequence/ezgif-frame-${String(index).padStart(3, '0')}.png`;
+  return `/images/process-sequence/ezgif-frame-${String(index).padStart(3, '0')}.webp`;
 }
 
 /** Animate a chapter card in and leave it there. */

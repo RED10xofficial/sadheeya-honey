@@ -57,7 +57,7 @@ const leftBenefits = [benefits[0], benefits[2], benefits[4]];
 const rightBenefits = [benefits[1], benefits[3], benefits[5]];
 
 function getFramePath(index: number): string {
-  return `/images/banner-sequence/ezgif-frame-${String(index).padStart(3, '0')}.png`;
+  return `/images/banner-sequence/ezgif-frame-${String(index).padStart(3, '0')}.webp`;
 }
 
 /** Animate a single benefit card into view and leave it there. */
